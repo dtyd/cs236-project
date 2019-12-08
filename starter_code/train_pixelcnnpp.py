@@ -1,6 +1,6 @@
 import argparse
 import os
-from data import CIFAR10Dataset, Imagenet32Dataset
+from data import CIFAR10Dataset, Imagenet32Dataset, SentimentDataset
 from models.embedders import BERTEncoder, OneHotClassEmbedding, UnconditionalClassEmbedding
 import torch
 from models.pixelcnnpp import ConditionalPixelCNNpp
@@ -10,6 +10,7 @@ import time
 from tqdm import tqdm
 from tensorboardX import SummaryWriter
 import numpy as np
+import pdb
 
 os.makedirs("images", exist_ok=True)
 
@@ -24,19 +25,20 @@ parser.add_argument("--n_resnet", type=int, default=5, help="number of layers fo
 parser.add_argument("--n_filters", type=int, default=160, help="dimensionality of the latent space")
 parser.add_argument("--sample_interval", type=int, default=1000, help="interval between image sampling")
 parser.add_argument("--use_cuda", type=int, default=1, help="use cuda if available")
-parser.add_argument("--output_dir", type=str, default="outputs/pixelcnn", help="directory to store the sampled outputs")
+parser.add_argument("--output_dir", type=str, default="outputs/sentiment", help="directory to store the sampled outputs")
 parser.add_argument("--debug", type=int, default=0)
 parser.add_argument("--train_on_val", type=int, default=0, help="train on val set, useful for debugging")
 parser.add_argument("--train", type=int, default=1, help="0 = eval, 1=train")
 parser.add_argument("--model_checkpoint", type=str, default=None,
                     help="load model from checkpoint, model_checkpoint = path_to_your_pixel_cnn_model.pt")
 parser.add_argument("--print_every", type=int, default=10)
-parser.add_argument("--dataset", type=str, default="cifar10", choices=["imagenet32", "cifar10"])
+parser.add_argument("--dataset", type=str, default="cifar10", choices=["imagenet32", "cifar10", "sentiment"])
 parser.add_argument("--conditioning", type=str, default="unconditional", choices=["unconditional", "one-hot", "bert"])
 
 
 def train(model, embedder, optimizer, scheduler,
-          train_loader, val_loader, opt):
+          train_loader, val_loader, opt): #generative_model = ConditionalPixelCNNpp, encoder = UnconditionalClassEmbedding(), train_loader =  
+    pdb.set_trace()
     print("TRAINING STARTS")
     for epoch in range(opt.n_epochs):
         model = model.train()
@@ -81,6 +83,13 @@ def train(model, embedder, optimizer, scheduler,
 
 
 def eval(model, embedder, test_loader):
+    print("sampling_images")
+    model = model.eval()
+    sample_image(model, embedder, opt.output_dir, n_row=4, batches_done=0,
+                 dataloader=test_loader, device=device)
+
+    return 0.0
+
     print("EVALUATING ON VAL")
     model = model.eval()
     bpd = 0.0
@@ -102,14 +111,19 @@ if __name__ == "__main__":
     opt = parser.parse_args()
     print(opt)
 
+    pdb.set_trace()
     print("loading dataset")
     if opt.dataset == "imagenet32":
         train_dataset = Imagenet32Dataset(train=not opt.train_on_val, max_size=1 if opt.debug else -1)
         val_dataset = Imagenet32Dataset(train=0, max_size=1 if opt.debug else -1)
-    else:
+    elif opt.dataset == "cifar10":
         assert opt.dataset == "cifar10"
         train_dataset = CIFAR10Dataset(train=not opt.train_on_val, max_size=1 if opt.debug else -1)
         val_dataset = CIFAR10Dataset(train=0, max_size=1 if opt.debug else -1)
+    else:
+        assert opt.dataset == "sentiment"
+        train_dataset = SentimentDataset(train=not opt.train_on_val, max_size=1 if opt.debug else -1)
+        val_dataset = SentimentDataset(train=0, max_size=1 if opt.debug else -1)
 
     print("creating dataloaders")
     train_dataloader = torch.utils.data.DataLoader(
@@ -143,6 +157,7 @@ if __name__ == "__main__":
                                              nr_resnet=opt.n_resnet, nr_filters=opt.n_filters,
                                              nr_logistic_mix=3 if train_dataset.image_shape[0] == 1 else 10)
 
+   #generative_model = nn.DataParallel(generative_model)
     generative_model = generative_model.to(device)
     encoder = encoder.to(device)
     print("Models loaded on device")

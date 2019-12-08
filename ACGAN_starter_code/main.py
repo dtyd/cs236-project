@@ -20,8 +20,12 @@ from utils import weights_init, compute_acc
 from network import _netG, _netD, _netD_CIFAR10, _netG_CIFAR10
 from folder import ImageFolder
 from embedders import BERTEncoder
+import matplotlib.pyplot as plt
+import pdb
 
 cifar_text_labels = ["airplane", "automobile", "bird", "cat", "deer", "dog", "frog", "horse", "ship", "truck"]
+sentiment_text_labels = ['ancient_city', 'broken_glass', 'classic_cars', 'cute_dog', 'dead_tree', 'falling_leaves', 'hot_pot', 'natural_bridge', 'wild_flowers', 'young_lady']
+
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--dataset', required=True, help='cifar10 | imagenet')
@@ -45,6 +49,7 @@ parser.add_argument('--embed_size', default=100, type=int, help='embed size')
 parser.add_argument('--num_classes', type=int, default=10, help='Number of classes for AC-GAN')
 parser.add_argument('--gpu_id', type=int, default=0, help='The ID of the specified GPU')
 
+pdb.set_trace()
 opt = parser.parse_args()
 print(opt)
 
@@ -91,12 +96,23 @@ elif opt.dataset == 'cifar10':
             transforms.ToTensor(),
             transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
         ]))
+elif opt.dataset == 'sentiment':
+    dataset = ImageFolder(
+        root=opt.dataroot,
+        transform=transforms.Compose([
+            transforms.Scale(opt.imageSize),
+            transforms.CenterCrop(opt.imageSize),
+            transforms.ToTensor(),
+            transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+            ]),
+        # classes_idx=(10, 20)
+    )
 else:
     raise NotImplementedError("No such dataset {}".format(opt.dataset))
 
 assert dataset
 dataloader = torch.utils.data.DataLoader(dataset, batch_size=opt.batchSize,
-                                         shuffle=True, num_workers=int(opt.workers))
+                                         shuffle=True, num_workers=int(opt.workers)) #drop_last=True ?
 
 # some hyper parameters
 ngpu = int(opt.ngpu)
@@ -158,8 +174,8 @@ encoder = BERTEncoder()
 # noise for evaluation
 eval_noise_ = np.random.normal(0, 1, (opt.batchSize, nz))
 eval_label = np.random.randint(0, num_classes, opt.batchSize)
-if opt.dataset == 'cifar10':
-            captions = [cifar_text_labels[per_label] for per_label in eval_label]
+if opt.dataset == 'cifar10' or opt.dataset == 'sentiment':
+            captions = [sentiment_text_labels[per_label] for per_label in eval_label]
             embedding = encoder(eval_label, captions)
             embedding = embedding.detach().numpy()
 eval_noise_[np.arange(opt.batchSize), :opt.embed_size] = embedding[:, :opt.embed_size]
@@ -201,8 +217,8 @@ for epoch in range(opt.niter):
         # train with fake
         noise.data.resize_(batch_size, nz, 1, 1).normal_(0, 1)
         label = np.random.randint(0, num_classes, batch_size)
-        if opt.dataset == 'cifar10':
-            captions = [cifar_text_labels[per_label] for per_label in label]
+        if opt.dataset == 'cifar10' or opt.dataset == 'sentiment':
+            captions = [sentiment_text_labels[per_label] for per_label in label]
             embedding = encoder(label, captions)
             embedding = embedding.detach().numpy()
         noise_ = np.random.normal(0, 1, (batch_size, nz))

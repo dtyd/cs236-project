@@ -1,10 +1,14 @@
 import numpy as np
 import torch
 from torch.utils.data import Dataset
+from torch.utils.data import Subset
 import os
 import matplotlib.pyplot as plt
 import torchvision
 from torchvision.transforms import *
+import matplotlib.pyplot as plt
+import pdb
+
 
 
 class CaptionedImageDataset(Dataset):
@@ -84,6 +88,46 @@ class CIFAR10Dataset(CaptionedImageDataset):
         return img, label, text_label
 
 
+class SentimentDataset(CaptionedImageDataset):
+    def __init__(self, root='datasets/sentiment_small', train=True, max_size=-1):
+        super().__init__((3, 32, 32), 10) #num_classes
+
+        dataset = torchvision.datasets.ImageFolder(root,
+            transform=transforms.Compose([
+                transforms.Scale(32),
+                transforms.CenterCrop(32),
+                transforms.ToTensor(),
+                #transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)), #normalize or not?
+                ]),
+        )
+        n = len(dataset)
+        np.random.seed(1)
+        n_val = int(n * .1)
+        n_train = n - n_val
+
+        indices = list(range(n))
+        np.random.shuffle(indices)
+        train_idx = indices[:n_train]
+        val_idx = indices[n_train:]
+        train_set = Subset(dataset, train_idx) #[10457, 4298, 8862, 2145, 5911, 882, 1071, 8901...]
+        val_set = Subset(dataset, val_idx) #[9166, 474, 3311, 8407, 8848, 4596, 3235, 7656,...]
+
+        if train == True:
+            self.dataset = train_set
+        else:
+            self.dataset = val_set
+        self.max_size = max_size if max_size > 0 else len(self.dataset)
+        self.text_labels = ['ancient_city', 'broken_glass', 'classic_cars', 'cute_dog', 'dead_tree', 'falling_leaves', 'hot_pot', 'natural_bridge', 'wild_flowers', 'young_lady']
+
+    def __len__(self):
+        return self.max_size
+
+    def __getitem__(self, item):
+        img, label = self.dataset[item]
+        img = 2 * img - 1
+        text_label = self.text_labels[label]
+        return img, label, text_label
+
 def load_vocab_imagenet(vocab_file):
     vocab = {}
     with open(vocab_file) as f:
@@ -94,6 +138,7 @@ def load_vocab_imagenet(vocab_file):
 
 
 if __name__ == "__main__":
+    pdb.set_trace()
     print("Testing CIFAR dataloader")
     d = CIFAR10Dataset()
     for i in range(2):
