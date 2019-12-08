@@ -178,6 +178,24 @@ if __name__ == '__main__':
     #       [0.6637, 0.8170, 0.9591,  ..., 0.3583, 0.1993, 0.1343],
     #       [0.1212, 0.1653, 0.3459,  ..., 0.2594, 0.2213, 0.1800]]]])
 
+
+    # normalize across each channels for each sample
+    x = torch.reshape(gen_imgs, (gen_imgs.size(0), gen_imgs.size(1), gen_imgs.size(2)*gen_imgs.size(3))) # reshaped to (total, 3, 32*32)
+    min_x = torch.min(x, 2)
+    max_x = torch.max(x, 2) # tuple, with element 0 being the mins, element 1 being argmins (size (total, 3) at each element)
+
+    # apply transform over each channel for each example 
+    x_renorm = torch.zeros_like(x_orig)
+
+    # renormalize to [-1, 1] 
+    for sample in range(x_renorm.size(0)):
+        for channel in range(x_renorm.size(1)):
+            #print(x_renorm[sample][channel].size())
+            x_renorm[sample][channel] = 2*(x_orig[sample][channel] - min_x[0][sample][channel].repeat(32,32)) / (max_x[0][sample][channel].repeat(32,32) - min_x[0][sample][channel].repeat(32,32)) - 1
+
+    gen_imgs = x_renorm
+    # feed x_renorm to inception score
+
     print (inception_score(gen_imgs, cuda=False, batch_size=batch_size, resize=True, splits=10)) # change or CUDA to true if necessary
     vutils.save_image(gen_imgs.data, "bert_epoch.png")
 
