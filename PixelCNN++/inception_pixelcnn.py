@@ -112,19 +112,19 @@ if __name__ == '__main__':
     captions = []
     gen_imgs = []
     done = False
-    pdb.set_trace()
 
     num_batches = int(total/batch_size)
     count = 0
-    print(num_batches)
-    for (_, labels_batch, captions_batch) in dataloader:
-        print(count)
-        captions += captions_batch
-        conditional_embeddings = encoder(labels_batch.to(device), captions)
-        imgs = generative_model.sample(conditional_embeddings).cpu()
-        gen_imgs.append(imgs)
-    pdb.set_trace() #check for normalization
-    gen_imgs = torch.cat(gen_imgs)
+    # print(num_batches)
+    # for (_, labels_batch, captions_batch) in dataloader:
+    #     print(count)
+    #     captions += captions_batch
+    #     conditional_embeddings = encoder(labels_batch.to(device), captions)
+    #     imgs = generative_model.sample(conditional_embeddings).cpu()
+    #     gen_imgs.append(imgs)
+    # pdb.set_trace() #check for normalization
+    # gen_imgs = torch.cat(gen_imgs)
+    gen_imgs = torch.load("file.pt")
 
 
     #normalize images of size[total, 3, 32, 32] here, looks like this
@@ -185,13 +185,13 @@ if __name__ == '__main__':
     max_x = torch.max(x, 2) # tuple, with element 0 being the mins, element 1 being argmins (size (total, 3) at each element)
 
     # apply transform over each channel for each example 
-    x_renorm = torch.zeros_like(x_orig)
+    x_renorm = torch.zeros_like(gen_imgs)
 
     # renormalize to [-1, 1] 
     for sample in range(x_renorm.size(0)):
         for channel in range(x_renorm.size(1)):
             #print(x_renorm[sample][channel].size())
-            x_renorm[sample][channel] = 2*(x_orig[sample][channel] - min_x[0][sample][channel].repeat(32,32)) / (max_x[0][sample][channel].repeat(32,32) - min_x[0][sample][channel].repeat(32,32)) - 1
+            x_renorm[sample][channel] = 2*(gen_imgs[sample][channel] - min_x[0][sample][channel].repeat(32,32)) / (max_x[0][sample][channel].repeat(32,32) - min_x[0][sample][channel].repeat(32,32)) - 1
 
     gen_imgs = x_renorm
     # feed x_renorm to inception score

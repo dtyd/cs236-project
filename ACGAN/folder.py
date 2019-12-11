@@ -1,8 +1,11 @@
+import torch
 import torch.utils.data as data
-
+from torch.utils.data import Dataset
 from PIL import Image
 import os
 import os.path
+import numpy as np
+import pdb
 
 IMG_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.ppm', '.bmp', '.pgm']
 
@@ -73,6 +76,78 @@ def default_loader(path):
         return accimage_loader(path)
     else:
         return pil_loader(path)
+
+class CaptionedImageDataset(Dataset):
+    def __init__(self, image_shape, n_classes):
+        self.image_shape = image_shape
+        self.n_classes = n_classes
+
+    def __getitem__(self, index: int) -> (torch.tensor, torch.tensor, list):
+        '''
+        :param index: index of the element to be fetched
+        :return: (image : torch.tensor , class_ids : torch.tensor ,captions : list(str))
+        '''
+        raise NotImplementedError
+
+    def __len__(self) -> int:
+        raise NotImplementedError
+
+
+class Imagenet32Dataset(CaptionedImageDataset):
+    def __init__(self, root="datasets/ImageNet32", train=True, max_size=-1):
+        '''
+        :param dirname: str, root dir where the dataset is downloaded
+        :param train: bool, true if train set else val
+        :param max_size: int, truncate size of the dataset, useful for debugging
+        '''
+        super().__init__((3, 32, 32), 1000)
+        self.root = root
+        if train:
+            self.dirname = os.path.join(root, "train")
+        else:
+            self.dirname = os.path.join(root, "val")
+
+        # self.classId2className = load_vocab_imagenet(os.path.join(root, "map_clsloc.txt"))
+        self.classId2className = {60: 'brown bear', 258: 'shopping cart', 366: 'seashore', 428: 'crane', 499: 'tree frog', 567: 'carousel', 670: 'frying pan', 705: 'bookshop', 907: 'basketball', 992: 'cheeseburger'}
+        classes = [60,258,366,428,499,567,670,705, 907,992]
+        data_files = sorted(os.listdir(self.dirname))
+        all_images = []
+        all_labelIds = []
+        for i, f in enumerate(data_files):
+            print("loading data file {}/{}, {}".format(i + 1, len(data_files), os.path.join(self.dirname, f)))
+            data = np.load(os.path.join(self.dirname, f))
+            all_images.append(data['data'])
+            all_labelIds.append(data['labels'] - 1)
+        images = np.concatenate(all_images, axis=0)
+        labelIds = np.concatenate(all_labelIds)
+
+        small_images = []
+        small_labelIds = []
+        n = len(labelIds)
+        for i in range(n):
+            if labelIds[i] in self.classId2className:
+                small_images.append(images[i])
+                new_class = int(np.where(classes == labelIds[i])[0])
+                small_labelIds.append(new_class)
+
+        self.images = np.vstack(small_images)
+        self.labelIds = np.array(small_labelIds)
+
+        if max_size >= 0:
+            # limit the size of the dataset
+            self.labelNames = self.labelNames[:max_size]
+            self.labelIds = self.labelIds[:max_size]
+
+
+    def __getitem__(self, index: int) -> (torch.tensor, torch.tensor, list):
+        image = torch.tensor(self.images[index]).reshape(3, 32, 32).float() / 128 - 1
+        label = self.labelIds[index]
+        #caption = self.labelNames[index].replace("_", " ")
+        #return (image, label, caption)
+        return (image, label)
+
+    def __len__(self):
+        return len(self.labelIds)
 
 
 class ImageFolder(data.Dataset):
